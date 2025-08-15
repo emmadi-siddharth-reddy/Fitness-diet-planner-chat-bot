@@ -10,10 +10,10 @@ const profileForm = document.getElementById("profileForm");
 
 // -------- State --------
 let profile = JSON.parse(localStorage.getItem("fitnessProfile") || "null");
-let history = JSON.parse(localStorage.getItem("chatHistory") || "[]"); // {role: "user"|"assistant", content: string}
+let history = []; // {role: "user"|"assistant", content: string}
 
-// -------- Modal functions --------
 function showModal() {
+  // Prefill if profile exists
   if (profile) {
     for (const [k, v] of Object.entries(profile)) {
       if (profileForm.elements[k]) profileForm.elements[k].value = v;
@@ -26,13 +26,10 @@ function hideModal() {
   profileModal.style.display = "none";
 }
 
-// -------- Load on page start --------
+// Show on first visit if no profile
 window.addEventListener("load", () => {
-  if (!profile) {
-    showModal();
-  }
-  renderHistory();
-  if (history.length === 0) greeting();
+  if (!profile) showModal();
+  greeting();
 });
 
 // -------- Chat UI helpers --------
@@ -58,11 +55,6 @@ function removeTyping(node) {
   if (node && node.parentNode) node.parentNode.removeChild(node);
 }
 
-function renderHistory() {
-  chat.innerHTML = ""; // Clear existing
-  history.forEach(msg => addMessage(msg.content, msg.role === "user" ? "user" : "bot"));
-}
-
 // -------- Events: Modal --------
 editProfileBtn.addEventListener("click", showModal);
 closeModal.addEventListener("click", hideModal);
@@ -70,6 +62,7 @@ closeModal.addEventListener("click", hideModal);
 profileForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(profileForm).entries());
+  // Normalize a bit
   data.age = Number(data.age || 0);
   data.weight = Number(data.weight || 0);
   data.height = Number(data.height || 0);
@@ -82,7 +75,6 @@ profileForm.addEventListener("submit", (e) => {
   localStorage.setItem("fitnessProfile", JSON.stringify(profile));
   hideModal();
   addMessage("Profile saved! Ask for a diet/workout plan anytime, or just chat.", "bot");
-  saveHistory();
 });
 
 // -------- Send message --------
@@ -102,11 +94,12 @@ function onSend(intentHint = "") {
     intentHint === "shopping" ? "Please generate a shopping list for this week's meals." : ""
   );
 
+  // Render user bubble
   addMessage(userMessage, "user");
   history.push({ role: "user", content: userMessage });
-  saveHistory();
   input.value = "";
 
+  // Call backend
   const typing = addTyping();
   fetch("/api/chat", {
     method: "POST",
@@ -124,18 +117,11 @@ function onSend(intentHint = "") {
     const reply = json.reply || "Sorry, I had trouble replying.";
     addMessage(reply, "bot");
     history.push({ role: "assistant", content: reply });
-    saveHistory();
   })
   .catch(err => {
     removeTyping(typing);
     addMessage(`Network error: ${err.message}`, "bot");
-    history.push({ role: "assistant", content: `Network error: ${err.message}` });
-    saveHistory();
   });
-}
-
-function saveHistory() {
-  localStorage.setItem("chatHistory", JSON.stringify(history));
 }
 
 // -------- Suggestions chips --------
@@ -159,6 +145,10 @@ function greeting() {
     "Use “Edit Profile” to update your details anytime.",
     "bot"
   );
-  history.push({ role: "assistant", content: "Hi! I’m your fitness & diet buddy. You can ask me anything, or use the chips below to get a personalized diet/workout plan. Use “Edit Profile” to update your details anytime." });
-  saveHistory();
 }
+
+
+
+
+
+
